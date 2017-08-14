@@ -1,0 +1,103 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <cs50.h>
+
+#define block 512
+
+int main(int argc, char *argv[])
+{
+    // test for command line argument specification
+    if (argc != 2)
+    {
+        fprintf(stderr, "usage: ./recover filename\n");
+        return 1;
+    }
+    
+    // Remember filename
+    char *picfile = argv[1];
+    
+    // Open file in question
+    FILE *pics = fopen(picfile, "r");
+    if (pics == NULL)
+    {
+        fclose(pics);
+        fprintf(stderr, "Could not open %s.\n", picfile);
+        return 2;
+    }
+    
+    // count JPEGs found
+    int Jcount = 0;
+    
+    // set condition for open JPEG and EOF
+    bool Jopen = false;
+    bool End = false;
+    bool start = false;
+    
+    // Open initial JPEG outfile
+    char current[10];
+    sprintf(current, "%03d.jpg", Jcount);
+    FILE *JCURout = fopen(current, "w");
+    if (JCURout == NULL)
+    {
+        fclose(JCURout);
+        fprintf(stderr, "Could not open %s.\n", current);
+        return 3;
+    }
+
+    // temporary storage
+    unsigned char *BUFFER = malloc(block * sizeof(char));
+
+    while (End == false)
+    {
+        // Read in bytes
+        fread(BUFFER, block, 1, pics); 
+        
+        // Check for the jpeg signature bytes.
+        if (BUFFER[0] == 0xff 
+            && BUFFER[1] == 0xd8 
+            && BUFFER[2] == 0xff 
+            && (BUFFER[3] & 0xf0) == 0xe0)
+        {
+            // start reading
+            start = true;
+            
+            // Check for an open JPEG
+            if (Jopen == true)
+            {
+                // close current file
+                fclose(JCURout);
+                
+                // open a new JPEG
+                sprintf(current, "%03d.jpg", Jcount);
+                Jcount++;
+                JCURout = fopen(current, "w");
+                if (JCURout == NULL)
+                {
+                    fclose(JCURout);
+                    fprintf(stderr, "Could not open %s.\n", current);
+                    return 3;
+                }
+                Jopen = true;
+            }
+        }
+        
+        if (start == true)
+        {
+            // write 512 bytes until a new JPEG is found.
+            fwrite(BUFFER, block, 1, JCURout);
+            Jopen = true;
+        }
+        
+        // Check for end of file
+        if (fread(BUFFER, block, 1, pics) != 1)
+        {
+            fclose(JCURout);
+            fclose(pics);
+            free(BUFFER);
+            return 0;
+        }
+    }
+    
+    
+}
